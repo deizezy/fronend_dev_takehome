@@ -23,6 +23,7 @@ class HomeController extends GetxController {
   int _page = 1;
   int _totalPages = 1;
   bool _isFetchingMore = false;
+  int _refreshCycle = 0;
 
   bool get hasMore => _page < _totalPages;
 
@@ -56,11 +57,21 @@ class HomeController extends GetxController {
   }
 
   Future<void> refreshDeals() async {
+    final cycle = ++_refreshCycle;
+    _isFetchingMore = false;
     _page = 1;
-    final res = await dealRepo.fetchDeals(page: 1);
-    _totalPages = res.totalPages;
-    deals.assignAll(res.items);
-    refreshController.refreshCompleted();
+    try {
+      final res = await dealRepo.fetchDeals(page: 1);
+
+      if (cycle != _refreshCycle) return;
+      _totalPages = res.totalPages;
+      deals.assignAll(res.items);
+      refreshController.refreshCompleted();
+      refreshController.resetNoData();
+    } catch (e) {
+      LogService.error('refreshDeals failed', e);
+      refreshController.refreshFailed();
+    }
   }
 
   Future<void> loadMore() async {
@@ -69,18 +80,31 @@ class HomeController extends GetxController {
       refreshController.loadNoData();
       return;
     }
+
+    final cycle = _refreshCycle;
     _isFetchingMore = true;
-    _page++;
+    final nextPage = _page + 1;
     try {
-      final res = await dealRepo.fetchDeals(page: _page);
+      final res = await dealRepo.fetchDeals(page: nextPage);
+
+      if (cycle != _refreshCycle) return;
+
+      _page = nextPage;
       _totalPages = res.totalPages;
-      deals.addAll(res.items);
+
+      final existingIds = deals.map((d) => d.id).toSet();
+      final newItems = res.items.where((d) => !existingIds.contains(d.id));
+      deals.addAll(newItems);
+
+      refreshController.loadComplete();
     } catch (e) {
       LogService.error('loadMore failed', e);
-      _page--;
+      refreshController.loadFailed();
+    } finally {
+      if (cycle == _refreshCycle) {
+        _isFetchingMore = false;
+      }
     }
-    _isFetchingMore = false;
-    refreshController.loadComplete();
   }
 
   void scrollToTop() {
