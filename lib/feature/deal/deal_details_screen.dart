@@ -10,8 +10,14 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
 
   @override
   Widget build(BuildContext context) {
-    final deal = controller.deal;
-    return Scaffold(
+    return Obx(() {
+      if (controller.isLoading.value || controller.deal.value == null) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
+      final deal = controller.deal.value!;
+      return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -138,5 +144,6 @@ class DealDetailsScreen extends GetView<DealDetailsController> {
         ),
       ),
     );
+    });
   }
 }
