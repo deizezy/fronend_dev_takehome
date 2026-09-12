@@ -9,6 +9,8 @@ class TheNetworkImage extends StatelessWidget {
   final double? height;
   final BoxFit fit;
   final BorderRadius? borderRadius;
+  final int? memCacheWidth;
+  final int? memCacheHeight;
 
   const TheNetworkImage({
     super.key,
@@ -17,10 +19,18 @@ class TheNetworkImage extends StatelessWidget {
     this.height,
     this.fit = BoxFit.cover,
     this.borderRadius,
+    this.memCacheWidth,
+    this.memCacheHeight,
   });
 
   @override
   Widget build(BuildContext context) {
+    final calculatedHeight =
+        (height != null && height!.isFinite) ? (height! * 2).round() : null;
+    final calculatedWidth = (width != null && width!.isFinite)
+        ? (width! * 2).round()
+        : (calculatedHeight == null ? 600 : null);
+
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.zero,
       child: CachedNetworkImage(
@@ -28,6 +38,8 @@ class TheNetworkImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        memCacheWidth: memCacheWidth ?? calculatedWidth,
+        memCacheHeight: memCacheHeight ?? calculatedHeight,
         placeholder: (context, _) => Shimmer.fromColors(
           baseColor: Colors.grey.shade300,
           highlightColor: Colors.grey.shade100,
