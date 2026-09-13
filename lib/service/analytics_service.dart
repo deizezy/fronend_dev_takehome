@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
+import 'package:rescu/service/fake_api_service.dart';
 
 import '../util/log_service.dart';
 
@@ -23,9 +26,58 @@ class AnalyticsEvent {
 class AnalyticsService extends GetxService {
   final events = <AnalyticsEvent>[].obs;
 
+  final Set<String> _impressedDealIds = {};
+
+  final List<Map<String, dynamic>> _pendingBatch = [];
+  Timer? _flushTimer;
+
+  bool hasImpressed(String dealId) => _impressedDealIds.contains(dealId);
+
   void logEvent(String name, [Map<String, dynamic> properties = const {}]) {
     final event = AnalyticsEvent(name, properties);
     events.add(event);
     LogService.log('analytics: $name $properties');
+  }
+
+  void trackDealImpression({
+    required String dealId,
+    required String source,
+    required int position,
+  }) {
+    if (_impressedDealIds.contains(dealId)) return;
+    _impressedDealIds.add(dealId);
+
+    logEvent('deal_impression', {
+      'deal_id': dealId,
+      'source': source,
+      'position': position,
+    });
+
+    _pendingBatch.add(events.last.toJson());
+
+    if (_pendingBatch.length >= 10) {
+      _flushBatch();
+    } else if (_pendingBatch.length == 1) {
+      _flushTimer = Timer(const Duration(seconds: 15), _flushBatch);
+    }
+  }
+
+  void _flushBatch() {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+    if (_pendingBatch.isEmpty) return;
+
+    final batchToSend = List<Map<String, dynamic>>.from(_pendingBatch);
+    _pendingBatch.clear();
+
+    if (Get.isRegistered<FakeApiService>()) {
+      Get.find<FakeApiService>().sendAnalyticsBatch(batchToSend);
+    }
+  }
+
+  @override
+  void onClose() {
+    _flushBatch();
+    super.onClose();
   }
 }

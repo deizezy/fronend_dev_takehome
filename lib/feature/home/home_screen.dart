@@ -99,8 +99,11 @@ class HomeScreen extends GetView<HomeController> {
                 ),
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) =>
-                        DealCard(deal: controller.visibleDeals[index]),
+                    (context, index) => DealCard(
+                      deal: controller.visibleDeals[index],
+                      source: 'home_feed',
+                      position: index,
+                    ),
                     childCount: controller.visibleDeals.length,
                   ),
                 ),

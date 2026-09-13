@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:rescu/feature/home/widget/flash_sales_countdown.dart';
+import 'package:rescu/service/analytics_service.dart';
 import 'package:rescu/service/cart_service.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 import '../../../app_config.dart';
 import '../../../model/deal_model.dart';
@@ -40,7 +44,10 @@ class FlashDealsSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             itemCount: deals.length,
             itemBuilder: (context, index) {
-              return _FlashRailCard(deal: deals[index]);
+              return _FlashRailCard(
+                deal: deals[index],
+                position: index,
+              );
             },
           ),
         ),
@@ -51,7 +58,8 @@ class FlashDealsSection extends StatelessWidget {
 
 class _FlashRailCard extends StatefulWidget {
   final DealModel deal;
-  const _FlashRailCard({required this.deal});
+  final int position;
+  const _FlashRailCard({required this.deal, required this.position});
 
   @override
   State<_FlashRailCard> createState() => _FlashRailCardState();
@@ -59,6 +67,7 @@ class _FlashRailCard extends StatefulWidget {
 
 class _FlashRailCardState extends State<_FlashRailCard> {
   late bool _isExpired;
+  Timer? _impressionTimer;
 
   @override
   void initState() {
@@ -71,6 +80,8 @@ class _FlashRailCardState extends State<_FlashRailCard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.deal.id != widget.deal.id ||
         oldWidget.deal.flashSaleEndsAt != widget.deal.flashSaleEndsAt) {
+      _impressionTimer?.cancel();
+      _impressionTimer = null;
       _checkExpired();
     }
   }
@@ -82,24 +93,50 @@ class _FlashRailCardState extends State<_FlashRailCard> {
   }
 
   @override
+  void dispose() {
+    _impressionTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final deal = widget.deal;
-    return SizedBox(
-      width: 200,
-      child: Opacity(
-        opacity: _isExpired ? 0.6 : 1.0,
-        child: Card(
-          color: Colors.white,
-          elevation: 0.5,
-          clipBehavior: Clip.antiAlias,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          child: InkWell(
-            onTap: _isExpired
-                ? null
-                : () => Get.toNamed(
-                      Routes.dealRoute(deal.id, source: 'flash_rail'),
-                      arguments: deal,
-                    ),
+    return VisibilityDetector(
+      key: Key('flash_rail_${deal.id}'),
+      onVisibilityChanged: (info) {
+        final analytics = Get.find<AnalyticsService>();
+        if (analytics.hasImpressed(deal.id.toString())) return;
+
+        if (info.visibleFraction >= 0.5) {
+          _impressionTimer ??= Timer(const Duration(seconds: 1), () {
+            analytics.trackDealImpression(
+              dealId: deal.id.toString(),
+              source: 'flash_rail',
+              position: widget.position,
+            );
+            _impressionTimer = null;
+          });
+        } else {
+          _impressionTimer?.cancel();
+          _impressionTimer = null;
+        }
+      },
+      child: SizedBox(
+        width: 200,
+        child: Opacity(
+          opacity: _isExpired ? 0.6 : 1.0,
+          child: Card(
+            color: Colors.white,
+            elevation: 0.5,
+            clipBehavior: Clip.antiAlias,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            child: InkWell(
+              onTap: _isExpired
+                  ? null
+                  : () => Get.toNamed(
+                        Routes.dealRoute(deal.id, source: 'flash_rail'),
+                        arguments: deal,
+                      ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -165,6 +202,7 @@ class _FlashRailCardState extends State<_FlashRailCard> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
