@@ -54,4 +54,17 @@ class CartService extends GetxService {
   void _recount() {
     itemCount.value = items.fold(0, (sum, i) => sum + i.quantity);
   }
+
+  void removeIfExpired(int dealId) {
+    final item = items.firstWhereOrNull((i) => i.deal.id == dealId);
+    if (item != null) {
+      remove(dealId);
+      Get.snackbar(
+        'Flash sale ended',
+        '${item.deal.name} was removed from your bag as the deal expired.',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
 }

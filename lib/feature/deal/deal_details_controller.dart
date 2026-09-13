@@ -25,15 +25,15 @@ class DealDetailsController extends GetxController {
 
   Worker? _cartWorker;
 
+  final isExpired = false.obs;
+
   @override
   void onInit() {
     super.onInit();
 
-    // 1. ตรวจสอบว่ามีข้อมูลส่งมาจากหน้าก่อนหน้าหรือไม่
     if (Get.arguments is DealModel) {
       _setupDeal(Get.arguments as DealModel);
     } else {
-      // 2. ถ้าไม่มี (มาจาก Deep Link) ให้อ่าน id จาก URL parameter
       final idStr = Get.parameters['id'];
       final id = int.tryParse(idStr ?? '');
       if (id != null) {
@@ -51,6 +51,9 @@ class DealDetailsController extends GetxController {
   void _setupDeal(DealModel loadedDeal) {
     deal.value = loadedDeal;
     _quantityLeft.value = loadedDeal.quantityLeft;
+    // check Flash sale
+    isExpired.value = loadedDeal.flashSaleEndsAt != null &&
+        DateTime.now().isAfter(loadedDeal.flashSaleEndsAt!);
     analytics.logEvent('deal_details_view', {
       'deal_id': loadedDeal.id,
       'source': Get.parameters['source'] ?? 'unknown',
@@ -80,6 +83,14 @@ class DealDetailsController extends GetxController {
   }
 
   void addToCart() {
+    if (isExpired.value) {
+      Get.snackbar(
+        'Error',
+        'This deal has expired. Please choose another deal.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
     final currentDeal = deal.value;
     if (currentDeal == null) return;
     cartService.add(currentDeal);
